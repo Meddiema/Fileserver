@@ -1,0 +1,44 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "FileServer",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/files/upload": {
+      "post": {
+        "tags": [
+          "FileServer"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/files/download/{token}": {
+      "get": {
+        "tags": [
+          "FileServer"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": { }
+}
