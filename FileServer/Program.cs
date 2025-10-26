@@ -44,6 +44,20 @@ app.MapPost("/api/files/upload", async (HttpRequest req) =>
     return Results.Ok(meta);
 });
 
+// ---------- List Files ----------
+app.MapGet("/api/files/list", () =>
+{
+    var files = Directory.GetFiles(uploadDir, "*.json")
+        .Select(f =>
+        {
+            var json = File.ReadAllText(f);
+            return System.Text.Json.JsonSerializer.Deserialize<object>(json);
+        })
+        .ToList();
+
+    return Results.Ok(files);
+});
+
 // ---------- Download ----------
 app.MapGet("/api/files/download/{token}", (string token) =>
 {
@@ -51,7 +65,7 @@ app.MapGet("/api/files/download/{token}", (string token) =>
     if (!File.Exists(metaFile)) return Results.NotFound();
 
     var fileName = Directory.GetFiles(uploadDir)
-        .FirstOrDefault(f => Path.GetFileName(f).StartsWith(token));
+        .FirstOrDefault(f => Path.GetFileName(f).StartsWith(token) && !f.EndsWith(".json"));
 
     if (fileName == null) return Results.NotFound();
     return Results.File(fileName, "application/octet-stream", Path.GetFileName(fileName));
