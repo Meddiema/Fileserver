@@ -1,19 +1,17 @@
-# Step 1: Build stage
+# Use the official .NET SDK image
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /app
+WORKDIR /src
 
-COPY *.sln .
-COPY FileServer/*.csproj ./FileServer/
-RUN dotnet restore
+# Copy everything
+COPY . .
 
-COPY FileServer/. ./FileServer/
-WORKDIR /app/FileServer
-RUN dotnet publish -c Release -o /out
+# Restore and publish
+RUN dotnet restore "./FileServer/FileServer.csproj"
+RUN dotnet publish "./FileServer/FileServer.csproj" -c Release -o /app/out
 
-# Step 2: Runtime stage
+# Final runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
-COPY --from=build /out .
+COPY --from=build /app/out .
 EXPOSE 5000
-ENV ASPNETCORE_URLS=http://*:5000
 ENTRYPOINT ["dotnet", "FileServer.dll"]
