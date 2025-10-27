@@ -1,19 +1,16 @@
-# Use .NET SDK for build
+# Use the official .NET SDK image for building
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy project files
-COPY FileServer/FileServer.csproj ./FileServer/
-RUN dotnet restore ./FileServer/FileServer.csproj
-
-# Copy everything and build
+# Copy everything into the container
 COPY . .
-WORKDIR /src/FileServer
-RUN dotnet publish FileServer.csproj -c Release -o /app/out
 
-# Final runtime image
+# Restore and build
+RUN dotnet restore "FileServer/FileServer.csproj"
+RUN dotnet publish "FileServer/FileServer.csproj" -c Release -o /app/publish
+
+# Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
-COPY --from=build /app/out .
-EXPOSE 8080
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "FileServer.dll"]
