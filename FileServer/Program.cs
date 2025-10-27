@@ -12,7 +12,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "FileServer API", Version = "v1" });
 
-    // 👇 Tells Swagger how to handle file uploads
+    // 👇 Tell Swagger how to handle file uploads
     c.MapType<IFormFile>(() => new OpenApiSchema
     {
         Type = "string",
@@ -39,14 +39,13 @@ var app = builder.Build();
 
 app.UseCors();
 
-if (app.Environment.IsDevelopment())
+// ✅ Always enable Swagger (even in production, for Render)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
+    c.RoutePrefix = string.Empty; // ✅ Shows Swagger UI at root URL
+});
 
 app.UseHttpsRedirection();
 app.MapControllers();
