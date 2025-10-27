@@ -1,5 +1,8 @@
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\appsettings.json
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\4f77802d06964da09ae63698d1c015c7.json
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\5a0ac1a2809f477e8e4b1c71571d4fa4.json
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\8fee8b17b6664a0d86f993771f7729c6.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.staticwebassets.endpoints.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.exe
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.deps.json
