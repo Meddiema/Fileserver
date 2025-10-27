@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: FileServer
+    env: docker
+    plan: free
+    autoDeploy: true
+    region: frankfurt
+    branch: main
+    buildCommand: ""
+    startCommand: ""
