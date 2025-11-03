@@ -1,71 +1,71 @@
-﻿using FileServer.Models;
-using FileServer.Services;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
-namespace FileServer.Controllers
+[ApiController]
+[Route("api/[controller]")]
+public class FileController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class FileController : ControllerBase
+    private readonly string _uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+
+    [HttpPost("upload")]
+    public async Task<IActionResult> Upload(IFormFile file)
     {
-        private readonly FileStorageService _service;
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided.");
 
-        public FileController(FileStorageService service)
+        if (!Directory.Exists(_uploadDir))
+            Directory.CreateDirectory(_uploadDir);
+
+        var token = Guid.NewGuid().ToString("N");
+        var originalFileName = Path.GetFileName(file.FileName);
+        var savePath = Path.Combine(_uploadDir, $"{token}_{originalFileName}");
+
+        using (var stream = new FileStream(savePath, FileMode.Create))
         {
-            _service = service;
+            await file.CopyToAsync(stream);
         }
 
-        // ✅ Upload endpoint
-        [HttpPost("upload")]
-        [Consumes("multipart/form-data")]
-        public async Task<IActionResult> Upload([FromForm] FileUploadRequest request)
+        var metadata = new
         {
-            try
-            {
-                if (request.File == null || request.File.Length == 0)
-                    return BadRequest("No file uploaded. Field name must be 'file'.");
+            token,
+            name = originalFileName,
+            size = file.Length,
+            uploaded = DateTime.UtcNow
+        };
 
-                var result = await _service.SaveFileAsync(request.File, request.Sender, request.Receiver);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Upload error: " + ex.Message);
-                return StatusCode(500, new { error = ex.Message });
-            }
-        }
+        System.IO.File.WriteAllText(
+            Path.Combine(_uploadDir, $"{token}.json"),
+            JsonSerializer.Serialize(metadata)
+        );
 
-        // ✅ List all files
-        [HttpGet("list")]
-        public IActionResult ListFiles()
-        {
-            var files = _service.ListFiles();
-            return Ok(files);
-        }
+        return Ok(metadata);
+    }
 
-        // ✅ Inbox by receiver
-        [HttpGet("inbox/{receiver}")]
-        public IActionResult GetInbox(string receiver)
-        {
-            var files = _service.ListFiles()
-                .Where(f => f.ContainsKey("receiver") &&
-                            string.Equals(f["receiver"]?.ToString(), receiver, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+    [HttpGet("list")]
+    public IActionResult List()
+    {
+        var files = Directory.GetFiles(_uploadDir, "*.json")
+            .Select(f => JsonSerializer.Deserialize<dynamic>(System.IO.File.ReadAllText(f)))
+            .ToList();
 
-            return Ok(files);
-        }
+        return Ok(files);
+    }
 
-        // ✅ Download by token
-        [HttpGet("download/{token}")]
-        public IActionResult Download(string token)
-        {
-            var (path, name) = _service.GetFilePath(token);
-            if (path == null || name == null)
-                return NotFound("File not found.");
+    [HttpGet("download/{token}")]
+    public IActionResult Download(string token)
+    {
+        var jsonPath = Path.Combine(_uploadDir, $"{token}.json");
+        if (!System.IO.File.Exists(jsonPath))
+            return NotFound("File not found");
 
-            var stream = System.IO.File.OpenRead(path);
-            const string contentType = "application/octet-stream";
-            return File(stream, contentType, name);
-        }
+        var meta = JsonSerializer.Deserialize<dynamic>(System.IO.File.ReadAllText(jsonPath));
+        string name = meta?.GetProperty("name").GetString();
+        string fullPath = Path.Combine(_uploadDir, $"{token}_{name}");
+
+        if (!System.IO.File.Exists(fullPath))
+            return NotFound("File not found on disk");
+
+        var mimeType = "application/octet-stream";
+        return PhysicalFile(fullPath, mimeType, name);
     }
 }

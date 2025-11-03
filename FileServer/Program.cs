@@ -1,52 +1,51 @@
-﻿using FileServer.Services;
-using Microsoft.OpenApi.Models;
+﻿using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add controller support
+// Allow larger uploads (up to 2 GB)
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; // 2 GB
+});
+
+// Increase server timeouts to handle big uploads
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; // 2 GB
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(30);
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(30);
+});
+
 builder.Services.AddControllers();
-
-// Add Swagger with IFormFile mapping
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "FileServer API", Version = "v1" });
-
-    // 👇 Tell Swagger how to handle file uploads
-    c.MapType<IFormFile>(() => new OpenApiSchema
-    {
-        Type = "string",
-        Format = "binary"
-    });
-});
-
-// Register FileStorageService
-builder.Services.AddScoped<FileStorageService>();
-
-// Allow CORS (useful for mobile testing)
-builder.Services.AddCors(opt =>
-{
-    opt.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod());
-});
-
-// Allow big uploads
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = long.MaxValue);
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-app.UseCors();
-
-// ✅ Always enable Swagger (even in production, for Render)
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
-    c.RoutePrefix = string.Empty; // ✅ Shows Swagger UI at root URL
-});
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseHttpsRedirection();
+app.UseAuthorization();
+
 app.MapControllers();
+
+// Ensure Uploads folder exists
+var uploadPath = Path.Combine(app.Environment.ContentRootPath, "Uploads");
+if (!Directory.Exists(uploadPath))
+{
+    Directory.CreateDirectory(uploadPath);
+}
+
+// Optionally serve uploaded files directly (for testing)
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadPath),
+    RequestPath = "/uploads"
+});
+
 app.Run();
