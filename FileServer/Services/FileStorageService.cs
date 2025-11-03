@@ -12,13 +12,17 @@ namespace FileServer.Services
             Directory.CreateDirectory(_uploadDir);
         }
 
+        // ✅ Save file with both token and real filename, and store its full path in JSON
         public async Task<Dictionary<string, object>> SaveFileAsync(IFormFile file, string? sender, string? receiver)
         {
             var token = Guid.NewGuid().ToString("N");
-            var savedName = $"{token}_{file.FileName}";
-            var path = Path.Combine(_uploadDir, savedName);
+            var originalName = file.FileName;
 
-            await using (var fs = new FileStream(path, FileMode.Create))
+            // File will be saved with token + "_" + originalName
+            var savedName = $"{token}_{originalName}";
+            var fullPath = Path.Combine(_uploadDir, savedName);
+
+            await using (var fs = new FileStream(fullPath, FileMode.Create))
             {
                 await file.CopyToAsync(fs);
             }
@@ -26,11 +30,12 @@ namespace FileServer.Services
             var metadata = new
             {
                 token,
-                name = file.FileName,
+                name = originalName,
                 size = file.Length,
                 uploaded = DateTime.UtcNow,
                 sender,
-                receiver
+                receiver,
+                path = fullPath
             };
 
             var jsonPath = Path.Combine(_uploadDir, $"{token}.json");
@@ -39,39 +44,55 @@ namespace FileServer.Services
             return new Dictionary<string, object>
             {
                 ["token"] = token,
-                ["name"] = file.FileName,
+                ["name"] = originalName,
                 ["size"] = file.Length,
                 ["sender"] = sender,
-                ["receiver"] = receiver
+                ["receiver"] = receiver,
+                ["path"] = fullPath,
+                ["uploaded"] = DateTime.UtcNow
             };
         }
 
+        // ✅ List files by reading JSON metadata
         public List<Dictionary<string, object>> ListFiles()
         {
             return Directory.GetFiles(_uploadDir, "*.json")
-                .Select(f =>
+                .Select(file =>
                 {
-                    var json = File.ReadAllText(f);
+                    var json = File.ReadAllText(file);
                     return JsonSerializer.Deserialize<Dictionary<string, object>>(json);
                 })
                 .Where(x => x != null)
                 .ToList()!;
         }
 
+        // ✅ Reliable GetFilePath — uses JSON metadata, not guessing
         public (string? Path, string? Name) GetFilePath(string token)
         {
             var metaFile = Path.Combine(_uploadDir, $"{token}.json");
             if (!File.Exists(metaFile))
                 return (null, null);
 
-            var fileName = Directory.GetFiles(_uploadDir)
-                .FirstOrDefault(f => Path.GetFileName(f).StartsWith(token) && !f.EndsWith(".json"));
+            try
+            {
+                var metaJson = File.ReadAllText(metaFile);
+                var meta = JsonSerializer.Deserialize<Dictionary<string, object>>(metaJson);
 
-            if (fileName == null)
+                if (meta == null || !meta.ContainsKey("path") || !meta.ContainsKey("name"))
+                    return (null, null);
+
+                var fullPath = meta["path"]?.ToString();
+                var name = meta["name"]?.ToString();
+
+                if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
+                    return (null, null);
+
+                return (fullPath, name);
+            }
+            catch
+            {
                 return (null, null);
-
-            var name = Path.GetFileName(fileName).Substring(token.Length + 1);
-            return (fileName, name);
+            }
         }
     }
 }

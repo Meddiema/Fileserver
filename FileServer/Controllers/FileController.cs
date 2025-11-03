@@ -15,16 +15,24 @@ namespace FileServer.Controllers
             _service = service;
         }
 
-        // ✅ Upload file (includes sender and receiver)
+        // ✅ Upload endpoint
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload([FromForm] FileUploadRequest request)
         {
-            if (request.File == null || request.File.Length == 0)
-                return BadRequest("No file uploaded.");
+            try
+            {
+                if (request.File == null || request.File.Length == 0)
+                    return BadRequest("No file uploaded. Field name must be 'file'.");
 
-            var result = await _service.SaveFileAsync(request.File, request.Sender, request.Receiver);
-            return Ok(result);
+                var result = await _service.SaveFileAsync(request.File, request.Sender, request.Receiver);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Upload error: " + ex.Message);
+                return StatusCode(500, new { error = ex.Message });
+            }
         }
 
         // ✅ List all files
@@ -35,7 +43,7 @@ namespace FileServer.Controllers
             return Ok(files);
         }
 
-        // ✅ List files meant for a specific receiver
+        // ✅ Inbox by receiver
         [HttpGet("inbox/{receiver}")]
         public IActionResult GetInbox(string receiver)
         {
@@ -47,18 +55,16 @@ namespace FileServer.Controllers
             return Ok(files);
         }
 
-        // ✅ Download a file by token
+        // ✅ Download by token
         [HttpGet("download/{token}")]
         public IActionResult Download(string token)
         {
             var (path, name) = _service.GetFilePath(token);
-
             if (path == null || name == null)
                 return NotFound("File not found.");
 
             var stream = System.IO.File.OpenRead(path);
-            var contentType = "application/octet-stream";
-
+            const string contentType = "application/octet-stream";
             return File(stream, contentType, name);
         }
     }

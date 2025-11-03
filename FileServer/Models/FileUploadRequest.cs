@@ -5,8 +5,9 @@ namespace FileServer.Models
 {
     public class FileUploadRequest
     {
+        // ✅ Explicit form name so PowerShell, Postman, and Android all match
         [FromForm(Name = "file")]
-        public IFormFile? File { get; set; }
+        public IFormFile File { get; set; }
 
         [FromForm(Name = "sender")]
         public string? Sender { get; set; }
