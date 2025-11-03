@@ -38,3 +38,5 @@ C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\refint\FileS
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.pdb
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.genruntimeconfig.cache
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\ref\FileServer.dll
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\07af655fa9c44484b16c90f1b0ef67f5.json
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
