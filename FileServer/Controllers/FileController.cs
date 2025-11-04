@@ -44,24 +44,22 @@ namespace FileServer.Controllers
             }
         }
 
-        // ✅ List files (shows proper names + direct download links)
+        // ✅ List files (shows proper names, sizes, and download links)
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
             try
             {
-                var urls = await _storageService.ListFilesAsync();
+                // Now expecting tuple data (Name, Size, PublicUrl)
+                var fileTuples = await _storageService.ListFilesAsync();
 
-                var files = urls.Select(u =>
+                var files = fileTuples.Select(f => new
                 {
-                    var name = Path.GetFileName(u);
-                    return new
-                    {
-                        Name = name,
-                        DownloadUrl = $"{Request.Scheme}://{Request.Host}/api/file/download/{Uri.EscapeDataString(name)}",
-                        PublicUrl = u,
-                        Uploaded = DateTime.UtcNow
-                    };
+                    Name = f.Name,
+                    Size = f.Size,
+                    PublicUrl = f.PublicUrl,
+                    DownloadUrl = $"{Request.Scheme}://{Request.Host}/api/file/download/{Uri.EscapeDataString(f.Name)}",
+                    Uploaded = DateTime.UtcNow
                 });
 
                 return Ok(files);

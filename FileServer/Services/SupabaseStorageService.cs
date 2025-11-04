@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -31,7 +32,7 @@ namespace FileServer.Services
             _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
         }
 
-        // ✅ Upload file to Supabase
+        // ✅ Upload file to Supabase public bucket
         public async Task<string> UploadAsync(Stream stream, string originalFileName, string contentType)
         {
             if (stream == null)
@@ -53,23 +54,24 @@ namespace FileServer.Services
                 throw new Exception($"Supabase upload failed: {response.StatusCode} - {error}");
             }
 
+            // Return public URL
             return $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{path}";
         }
 
-        // ✅ List all files
-        public async Task<List<string>> ListFilesAsync()
+        // ✅ List all files in Supabase bucket
+        public async Task<List<(string Name, long Size, string PublicUrl)>> ListFilesAsync()
         {
             var listUrl = $"{_supabaseUrl}/storage/v1/object/list/{_bucketName}";
 
-            var body = new
+            var requestBody = new
             {
                 prefix = "",
                 limit = 100,
                 offset = 0,
-                sortBy = new { column = "name", order = "asc" }
+                sortBy = new { column = "created_at", order = "desc" }
             };
 
-            var jsonBody = new StringContent(JsonSerializer.Serialize(body), System.Text.Encoding.UTF8, "application/json");
+            var jsonBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync(listUrl, jsonBody);
 
             if (!response.IsSuccessStatusCode)
@@ -79,41 +81,45 @@ namespace FileServer.Services
             }
 
             var json = await response.Content.ReadAsStringAsync();
+
             var files = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
-            var urls = new List<string>();
+            var result = new List<(string, long, string)>();
 
             if (files != null)
             {
                 foreach (var file in files)
                 {
-                    if (file.TryGetValue("name", out var name))
+                    string name = file.ContainsKey("name") ? file["name"]?.ToString() ?? "unknown" : "unknown";
+                    long size = 0;
+
+                    // Try extract size if metadata is present
+                    if (file.ContainsKey("metadata") && file["metadata"] != null)
                     {
-                        urls.Add($"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{name}");
+                        try
+                        {
+                            var metadata = file["metadata"]?.ToString();
+                            if (!string.IsNullOrWhiteSpace(metadata))
+                            {
+                                using var doc = JsonDocument.Parse(metadata);
+                                if (doc.RootElement.TryGetProperty("size", out var sizeProp))
+                                    size = sizeProp.GetInt64();
+                            }
+                        }
+                        catch
+                        {
+                            size = 0; // fallback
+                        }
                     }
+
+                    string publicUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{name}";
+                    result.Add((name, size, publicUrl));
                 }
             }
 
-            return urls;
+            return result;
         }
 
-        // ✅ Delete file
-        public async Task DeleteAsync(string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(fileName))
-                throw new ArgumentException("Invalid file name.");
-
-            var deleteUrl = $"{_supabaseUrl}/storage/v1/object/{_bucketName}/{fileName}";
-            var request = new HttpRequestMessage(HttpMethod.Delete, deleteUrl);
-
-            var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                throw new Exception($"Supabase delete failed: {response.StatusCode} - {error}");
-            }
-        }
-
-        // ✅ Optional - Download file
+        // ✅ Download file by name
         public async Task<Stream> DownloadAsync(string fileName)
         {
             var downloadUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
@@ -123,13 +129,6 @@ namespace FileServer.Services
                 throw new Exception($"Download failed: {response.StatusCode}");
 
             return await response.Content.ReadAsStreamAsync();
-        }
-
-        // ✅ Returns a public URL for the specified file
-        public Task<string> GetPublicUrlAsync(string fileName)
-        {
-            var publicUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
-            return Task.FromResult(publicUrl);
         }
     }
 }
