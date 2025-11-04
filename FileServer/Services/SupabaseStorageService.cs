@@ -18,7 +18,6 @@ namespace FileServer.Services
 
         public SupabaseStorageService()
         {
-            // ✅ Load configuration from appsettings.Development.json
             var config = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.Development.json", optional: true)
                 .Build();
@@ -32,7 +31,7 @@ namespace FileServer.Services
             _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
         }
 
-        // ✅ Upload file to Supabase Storage via REST API
+        // ✅ Upload file to Supabase
         public async Task<string> UploadAsync(Stream stream, string originalFileName, string contentType)
         {
             if (stream == null)
@@ -48,25 +47,36 @@ namespace FileServer.Services
             content.Headers.ContentType = new MediaTypeHeaderValue(contentType ?? "application/octet-stream");
 
             var response = await _httpClient.PostAsync(uploadUrl, content);
-
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
                 throw new Exception($"Supabase upload failed: {response.StatusCode} - {error}");
             }
 
-            // ✅ Return public file URL
             return $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{path}";
         }
 
-        // ✅ List all files in the Supabase bucket
+        // ✅ List all files
         public async Task<List<string>> ListFilesAsync()
         {
             var listUrl = $"{_supabaseUrl}/storage/v1/object/list/{_bucketName}";
-            var response = await _httpClient.PostAsync(listUrl, new StringContent("{}"));
+
+            var body = new
+            {
+                prefix = "",
+                limit = 100,
+                offset = 0,
+                sortBy = new { column = "name", order = "asc" }
+            };
+
+            var jsonBody = new StringContent(JsonSerializer.Serialize(body), System.Text.Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(listUrl, jsonBody);
 
             if (!response.IsSuccessStatusCode)
-                throw new Exception($"Supabase list failed: {response.StatusCode}");
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Supabase list failed: {response.StatusCode} - {error}");
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             var files = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
@@ -86,7 +96,7 @@ namespace FileServer.Services
             return urls;
         }
 
-        // ✅ Delete a file from Supabase
+        // ✅ Delete file
         public async Task DeleteAsync(string fileName)
         {
             if (string.IsNullOrWhiteSpace(fileName))
@@ -101,6 +111,18 @@ namespace FileServer.Services
                 var error = await response.Content.ReadAsStringAsync();
                 throw new Exception($"Supabase delete failed: {response.StatusCode} - {error}");
             }
+        }
+
+        // ✅ Optional - Download a file as stream (for mobile use)
+        public async Task<Stream> DownloadAsync(string fileName)
+        {
+            var downloadUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
+            var response = await _httpClient.GetAsync(downloadUrl);
+
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Download failed: {response.StatusCode}");
+
+            return await response.Content.ReadAsStreamAsync();
         }
     }
 }
