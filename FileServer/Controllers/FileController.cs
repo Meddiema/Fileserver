@@ -1,6 +1,6 @@
 ﻿using FileServer.Services;
 using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.AspNetCore.Annotations;
+using System.IO;
 
 namespace FileServer.Controllers
 {
@@ -15,10 +15,8 @@ namespace FileServer.Controllers
             _storageService = new SupabaseStorageService();
         }
 
-        // ✅ Upload endpoint (used by the mobile app)
-        // Hide it from Swagger to prevent 500 error
+        // ✅ Upload endpoint
         [HttpPost("upload")]
-        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
@@ -27,18 +25,34 @@ namespace FileServer.Controllers
             using var stream = file.OpenReadStream();
             var url = await _storageService.UploadAsync(stream, file.FileName, file.ContentType);
 
-            return Ok(new { FileName = file.FileName, Url = url });
+            return Ok(new
+            {
+                Name = file.FileName,
+                Size = file.Length,
+                Url = url,
+                Uploaded = DateTime.UtcNow
+            });
         }
 
-        // ✅ List files (for Received Files page)
+        // ✅ List files (return structured objects)
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
-            var files = await _storageService.ListFilesAsync();
+            var urls = await _storageService.ListFilesAsync();
+
+            var files = urls.Select(u => new
+            {
+                Token = Path.GetFileName(u),   // simple identifier
+                Name = Path.GetFileName(u),
+                Size = 0,                      // size not available via API
+                Path = u,
+                Uploaded = DateTime.UtcNow     // placeholder
+            });
+
             return Ok(files);
         }
 
-        // ✅ Download file by filename
+        // ✅ Download by filename
         [HttpGet("download/{fileName}")]
         public async Task<IActionResult> Download(string fileName)
         {
