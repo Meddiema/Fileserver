@@ -1,5 +1,6 @@
 ﻿using FileServer.Services;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FileServer.Controllers
 {
@@ -14,8 +15,10 @@ namespace FileServer.Controllers
             _storageService = new SupabaseStorageService();
         }
 
-        // ✅ Upload endpoint (already working on mobile)
+        // ✅ Upload endpoint (used by the mobile app)
+        // Hide it from Swagger to prevent 500 error
         [HttpPost("upload")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
