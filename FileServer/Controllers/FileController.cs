@@ -1,5 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
+﻿using FileServer.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Threading.Tasks;
 
 namespace FileServer.Controllers
 {
@@ -7,128 +10,48 @@ namespace FileServer.Controllers
     [Route("api/[controller]")]
     public class FileController : ControllerBase
     {
-        private readonly string _uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+        private readonly SupabaseStorageService _storageService;
 
         public FileController()
         {
-            if (!Directory.Exists(_uploadDir))
-                Directory.CreateDirectory(_uploadDir);
+            _storageService = new SupabaseStorageService();
         }
 
-        // ✅ Upload endpoint — handles any file type, up to 2 GB
+        // ✅ Upload a file to Supabase
         [HttpPost("upload")]
-        [RequestSizeLimit(2L * 1024L * 1024L * 1024L)] // 2 GB
-        [RequestFormLimits(MultipartBodyLengthLimit = 2L * 1024L * 1024L * 1024L)]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
         {
-            try
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            using var stream = file.OpenReadStream();
+            var url = await _storageService.UploadAsync(stream, file.FileName, file.ContentType);
+
+            return Ok(new
             {
-                if (file == null || file.Length == 0)
-                    return BadRequest("No file provided");
-
-                var token = Guid.NewGuid().ToString("N");
-                var fileName = file.FileName;
-                var savePath = Path.Combine(_uploadDir, $"{token}_{fileName}");
-
-                Console.WriteLine($"[Upload] Saving file: {fileName} ({file.Length} bytes)");
-
-                using (var stream = new FileStream(savePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                var meta = new
-                {
-                    token,
-                    name = fileName,
-                    size = file.Length,
-                    uploaded = DateTime.UtcNow,
-                    path = savePath
-                };
-
-                var jsonPath = Path.Combine(_uploadDir, $"{token}.json");
-                await System.IO.File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(meta));
-
-                Console.WriteLine($"[Upload] File saved successfully: {savePath}");
-
-                return Ok(meta);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Upload] Error: {ex}");
-                return StatusCode(500, ex.Message);
-            }
+                file.FileName,
+                file.Length,
+                url
+            });
         }
 
-        // ✅ Download endpoint — now logs every step
-        [HttpGet("download/{token}")]
-        public IActionResult Download(string token)
-        {
-            try
-            {
-                Console.WriteLine($"[Download] Requested token: {token}");
-
-                var jsonPath = Path.Combine(_uploadDir, $"{token}.json");
-                if (!System.IO.File.Exists(jsonPath))
-                {
-                    Console.WriteLine($"[Download] Metadata not found for {token}");
-                    return NotFound("Metadata not found");
-                }
-
-                var jsonContent = System.IO.File.ReadAllText(jsonPath);
-                var meta = JsonSerializer.Deserialize<JsonElement>(jsonContent);
-                var fileName = meta.GetProperty("name").GetString();
-                var fullPath = Path.Combine(_uploadDir, $"{token}_{fileName}");
-
-                Console.WriteLine($"[Download] Looking for file: {fullPath}");
-
-                if (!System.IO.File.Exists(fullPath))
-                {
-                    Console.WriteLine($"[Download] File not found: {fullPath}");
-                    return NotFound($"File {fileName} not found");
-                }
-
-                var mimeType = "application/octet-stream";
-                var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
-                Console.WriteLine($"[Download] Returning file: {fileName}");
-                return File(stream, mimeType, fileName);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Download] Error: {ex}");
-                return StatusCode(500, ex.Message);
-            }
-        }
-
-        // ✅ List all uploaded files (for debugging)
+        // ✅ List all files in the bucket
         [HttpGet("list")]
-        public IActionResult ListFiles()
+        public async Task<IActionResult> ListFiles()
         {
-            try
-            {
-                var files = Directory.GetFiles(_uploadDir, "*.json")
-                    .Select(jsonPath =>
-                    {
-                        var meta = JsonSerializer.Deserialize<JsonElement>(System.IO.File.ReadAllText(jsonPath));
-                        return new
-                        {
-                            token = meta.GetProperty("token").GetString(),
-                            name = meta.GetProperty("name").GetString(),
-                            size = meta.GetProperty("size").GetInt64(),
-                            uploaded = meta.GetProperty("uploaded").GetDateTime()
-                        };
-                    })
-                    .OrderByDescending(f => f.uploaded)
-                    .ToList();
+            var files = await _storageService.ListFilesAsync();
+            return Ok(files);
+        }
 
-                Console.WriteLine($"[ListFiles] Returning {files.Count} entries");
-                return Ok(files);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ListFiles] Error: {ex}");
-                return StatusCode(500, ex.Message);
-            }
+        // ✅ Delete file from Supabase bucket
+        [HttpDelete("delete/{fileName}")]
+        public async Task<IActionResult> DeleteFile(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return BadRequest("Invalid file name.");
+
+            await _storageService.DeleteAsync(fileName);
+            return Ok($"File '{fileName}' deleted successfully.");
         }
     }
 }

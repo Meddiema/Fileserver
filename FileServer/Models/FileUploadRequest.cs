@@ -7,12 +7,14 @@ namespace FileServer.Models
     {
         // ✅ Explicit form name so PowerShell, Postman, and Android all match
         [FromForm(Name = "file")]
-        public IFormFile File { get; set; }
+        public required IFormFile File { get; set; }
+
 
         [FromForm(Name = "sender")]
         public string? Sender { get; set; }
 
         [FromForm(Name = "receiver")]
         public string? Receiver { get; set; }
+
     }
 }

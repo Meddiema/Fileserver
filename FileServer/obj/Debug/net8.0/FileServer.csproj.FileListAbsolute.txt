@@ -1,5 +1,6 @@
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\appsettings.json
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\07af655fa9c44484b16c90f1b0ef67f5.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\4f77802d06964da09ae63698d1c015c7.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\5a0ac1a2809f477e8e4b1c71571d4fa4.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\8fee8b17b6664a0d86f993771f7729c6.json
@@ -9,8 +10,13 @@ C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.d
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.runtimeconfig.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\FileServer.pdb
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\BirdMessenger.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Microsoft.AspNetCore.OpenApi.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Microsoft.OpenApi.dll
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\MimeMapping.dll
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Newtonsoft.Json.dll
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Supabase.Core.dll
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Supabase.Storage.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
@@ -32,11 +38,10 @@ C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebass
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.development.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.build.endpoints.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\swae.build.ex.cache
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.csproj.Up2Date
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\refint\FileServer.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.pdb
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.genruntimeconfig.cache
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\ref\FileServer.dll
-C:\Users\MEDDIE\source\repos\FileServer\FileServer\bin\Debug\net8.0\Uploads\07af655fa9c44484b16c90f1b0ef67f5.json
-C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
