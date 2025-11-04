@@ -3,13 +3,13 @@ using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Allow larger uploads (up to 2 GB)
+// ✅ Allow large uploads (up to 2 GB)
 builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; // 2 GB
 });
 
-// Increase server timeouts to handle big uploads
+// ✅ Increase Kestrel limits for large uploads
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; // 2 GB
@@ -17,35 +17,50 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(30);
 });
 
+// ✅ Add Controllers + Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ✅ Enable CORS (important for mobile devices)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// ✅ Use Swagger UI in both dev & production
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// ✅ Enable CORS globally
+app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
 
-// Ensure Uploads folder exists
+// ✅ Ensure Uploads folder exists (local testing only)
 var uploadPath = Path.Combine(app.Environment.ContentRootPath, "Uploads");
 if (!Directory.Exists(uploadPath))
 {
     Directory.CreateDirectory(uploadPath);
 }
 
-// Optionally serve uploaded files directly (for testing)
+// ✅ Serve static files directly (optional)
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/uploads"
 });
 
+// ✅ Start the web app
 app.Run();

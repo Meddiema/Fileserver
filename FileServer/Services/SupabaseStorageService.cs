@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 
 namespace FileServer.Services
 {
@@ -13,169 +13,94 @@ namespace FileServer.Services
     {
         private readonly string _supabaseUrl;
         private readonly string _supabaseKey;
-        private readonly string _bucket;
+        private readonly string _bucketName;
+        private readonly HttpClient _httpClient;
 
         public SupabaseStorageService()
         {
-            _supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE_URL") ??
-                           throw new InvalidOperationException("SUPABASE_URL is not set.");
-            _supabaseKey = Environment.GetEnvironmentVariable("SUPABASE_KEY") ??
-                           throw new InvalidOperationException("SUPABASE_KEY is not set.");
-            _bucket = Environment.GetEnvironmentVariable("SUPABASE_BUCKET") ?? "upload";
+            // ✅ Load configuration from appsettings.Development.json
+            var config = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.Development.json", optional: true)
+                .Build();
+
+            _supabaseUrl = config["SUPABASE_URL"] ?? throw new InvalidOperationException("SUPABASE_URL is not set.");
+            _supabaseKey = config["SUPABASE_KEY"] ?? throw new InvalidOperationException("SUPABASE_KEY is not set.");
+            _bucketName = config["SUPABASE_BUCKET"] ?? "upload";
+
+            _httpClient = new HttpClient();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _supabaseKey);
+            _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
         }
 
-        private HttpClient CreateClient()
-        {
-            var client = new HttpClient();
-            // Supabase expects both apikey and Authorization header for server requests
-            client.DefaultRequestHeaders.Remove("apikey");
-            client.DefaultRequestHeaders.Add("apikey", _supabaseKey);
-
-            client.DefaultRequestHeaders.Remove("Authorization");
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_supabaseKey}");
-
-            return client;
-        }
-
-        /// <summary>
-        /// Uploads the provided stream to Supabase Storage and returns the public URL.
-        /// </summary>
+        // ✅ Upload file to Supabase Storage via REST API
         public async Task<string> UploadAsync(Stream stream, string originalFileName, string contentType)
         {
-            if (stream == null) throw new ArgumentNullException(nameof(stream));
-            if (string.IsNullOrWhiteSpace(originalFileName)) throw new ArgumentNullException(nameof(originalFileName));
+            if (stream == null)
+                throw new ArgumentNullException(nameof(stream));
 
-            // Read bytes (Supabase accepts raw body)
-            byte[] bytes;
-            using (var ms = new MemoryStream())
+            if (string.IsNullOrEmpty(originalFileName))
+                throw new ArgumentNullException(nameof(originalFileName));
+
+            var path = $"{Guid.NewGuid()}_{originalFileName}";
+            var uploadUrl = $"{_supabaseUrl}/storage/v1/object/{_bucketName}/{path}";
+
+            using var content = new StreamContent(stream);
+            content.Headers.ContentType = new MediaTypeHeaderValue(contentType ?? "application/octet-stream");
+
+            var response = await _httpClient.PostAsync(uploadUrl, content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                await stream.CopyToAsync(ms);
-                bytes = ms.ToArray();
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Supabase upload failed: {response.StatusCode} - {error}");
             }
 
-            var token = Guid.NewGuid().ToString("N");
-            var safeFileName = Path.GetFileName(originalFileName);
-            var objectPath = $"{token}_{safeFileName}";
-            var encodedPath = Uri.EscapeDataString(objectPath);
-
-            var uploadUrl = $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/{_bucket}/{encodedPath}";
-
-            using var client = CreateClient();
-            using var content = new ByteArrayContent(bytes);
-            content.Headers.ContentLength = bytes.Length;
-            content.Headers.ContentType = MediaTypeHeaderValue.Parse(string.IsNullOrWhiteSpace(contentType)
-                ? "application/octet-stream"
-                : contentType);
-
-            var resp = await client.PutAsync(uploadUrl, content);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var body = await resp.Content.ReadAsStringAsync();
-                throw new Exception($"Supabase upload failed: {(int)resp.StatusCode} {resp.ReasonPhrase} - {body}");
-            }
-
-            // Construct public URL
-            var publicUrl = $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/public/{_bucket}/{encodedPath}";
-            return publicUrl;
+            // ✅ Return public file URL
+            return $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{path}";
         }
 
-        /// <summary>
-        /// Lists objects in the bucket. Returns a simple list of file metadata objects:
-        /// { name, size, updated_at }
-        /// </summary>
-        public async Task<List<object>> ListFilesAsync()
+        // ✅ List all files in the Supabase bucket
+        public async Task<List<string>> ListFilesAsync()
         {
-            var listUrl = $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/list/{_bucket}";
-            using var client = CreateClient();
+            var listUrl = $"{_supabaseUrl}/storage/v1/object/list/{_bucketName}";
+            var response = await _httpClient.PostAsync(listUrl, new StringContent("{}"));
 
-            // Many Supabase setups accept POST to list; try POST then fallback to GET
-            HttpResponseMessage resp = null;
-            try
-            {
-                resp = await client.PostAsync(listUrl, null);
-            }
-            catch
-            {
-                // ignore and try GET below
-            }
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Supabase list failed: {response.StatusCode}");
 
-            if (resp == null || !resp.IsSuccessStatusCode)
-            {
-                // try GET (some Supabase versions require GET with ?prefix=)
-                var getUrl = $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/list/{_bucket}";
-                resp = await client.GetAsync(getUrl);
-            }
+            var json = await response.Content.ReadAsStringAsync();
+            var files = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
+            var urls = new List<string>();
 
-            if (!resp.IsSuccessStatusCode)
+            if (files != null)
             {
-                var body = await resp.Content.ReadAsStringAsync();
-                throw new Exception($"Supabase list failed: {(int)resp.StatusCode} {resp.ReasonPhrase} - {body}");
-            }
-
-            var respBody = await resp.Content.ReadAsStringAsync();
-            // parse as JSON array of objects
-            try
-            {
-                var doc = JsonDocument.Parse(respBody);
-                var arr = new List<object>();
-
-                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                foreach (var file in files)
                 {
-                    foreach (var el in doc.RootElement.EnumerateArray())
+                    if (file.TryGetValue("name", out var name))
                     {
-                        // build a small object with the fields we care about
-                        string name = el.TryGetProperty("name", out var pn) ? pn.GetString() :
-                                      el.TryGetProperty("id", out var pi) ? pi.GetString() : null;
-                        long size = el.TryGetProperty("size", out var ps) && ps.TryGetInt64(out var s) ? s : 0;
-                        string updatedAt = el.TryGetProperty("updated_at", out var pu) ? pu.GetString() : null;
-
-                        if (!string.IsNullOrEmpty(name))
-                        {
-                            arr.Add(new
-                            {
-                                name,
-                                size,
-                                updated = updatedAt,
-                                url = $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/public/{_bucket}/{Uri.EscapeDataString(name)}"
-                            });
-                        }
+                        urls.Add($"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{name}");
                     }
                 }
+            }
 
-                return arr;
-            }
-            catch (JsonException ex)
-            {
-                throw new Exception("Failed to parse Supabase list response: " + ex.Message);
-            }
+            return urls;
         }
 
-        /// <summary>
-        /// Delete object at given objectPath (exact name, e.g. "token_filename.ext")
-        /// </summary>
-        public async Task DeleteAsync(string objectPath)
+        // ✅ Delete a file from Supabase
+        public async Task DeleteAsync(string fileName)
         {
-            if (string.IsNullOrWhiteSpace(objectPath)) throw new ArgumentNullException(nameof(objectPath));
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new ArgumentException("Invalid file name.");
 
-            var encodedPath = Uri.EscapeDataString(objectPath);
-            var deleteUrl = $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/{_bucket}/{encodedPath}";
+            var deleteUrl = $"{_supabaseUrl}/storage/v1/object/{_bucketName}/{fileName}";
+            var request = new HttpRequestMessage(HttpMethod.Delete, deleteUrl);
 
-            using var client = CreateClient();
-            var resp = await client.DeleteAsync(deleteUrl);
-            if (!resp.IsSuccessStatusCode)
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
             {
-                var body = await resp.Content.ReadAsStringAsync();
-                throw new Exception($"Supabase delete failed: {(int)resp.StatusCode} {resp.ReasonPhrase} - {body}");
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Supabase delete failed: {response.StatusCode} - {error}");
             }
-        }
-
-        /// <summary>
-        /// Helper to get public URL for a stored object name (token_filename.ext)
-        /// </summary>
-        public string GetPublicUrl(string objectPath)
-        {
-            if (string.IsNullOrWhiteSpace(objectPath)) return string.Empty;
-            return $"{_supabaseUrl.TrimEnd('/')}/storage/v1/object/public/{_bucket}/{Uri.EscapeDataString(objectPath)}";
         }
     }
 }
