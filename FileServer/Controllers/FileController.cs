@@ -1,9 +1,5 @@
-﻿using FileServer.Services;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Net.Http;
-using System.Threading.Tasks;
+﻿using Microsoft.AspNetCore.Mvc;
+using FileServer.Services;
 
 namespace FileServer.Controllers
 {
@@ -12,16 +8,15 @@ namespace FileServer.Controllers
     public class FileController : ControllerBase
     {
         private readonly SupabaseStorageService _storageService;
-        private readonly HttpClient _httpClient;
 
         public FileController()
         {
             _storageService = new SupabaseStorageService();
-            _httpClient = new HttpClient();
         }
 
         // ✅ Upload file
         [HttpPost("upload")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
@@ -29,8 +24,7 @@ namespace FileServer.Controllers
 
             using var stream = file.OpenReadStream();
             var url = await _storageService.UploadAsync(stream, file.FileName, file.ContentType);
-
-            return Ok(new { file.FileName, file.Length, url });
+            return Ok(new { fileName = file.FileName, length = file.Length, url });
         }
 
         // ✅ List all files
@@ -41,39 +35,12 @@ namespace FileServer.Controllers
             return Ok(files);
         }
 
-        // ✅ Download file via Supabase public URL
-        [HttpGet("download/{fileName}")]
-        public async Task<IActionResult> DownloadFile(string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(fileName))
-                return BadRequest("Invalid file name.");
-
-            var bucket = Environment.GetEnvironmentVariable("SUPABASE_BUCKET") ?? "upload";
-            var baseUrl = Environment.GetEnvironmentVariable("SUPABASE_URL");
-            var fileUrl = $"{baseUrl}/storage/v1/object/public/{bucket}/{fileName}";
-
-            try
-            {
-                var response = await _httpClient.GetAsync(fileUrl);
-                if (!response.IsSuccessStatusCode)
-                    return NotFound("File not found.");
-
-                var stream = await response.Content.ReadAsStreamAsync();
-                var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
-                return File(stream, contentType, fileName);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Download failed: {ex.Message}");
-            }
-        }
-
         // ✅ Delete file
-        [HttpDelete("delete/{fileName}")]
-        public async Task<IActionResult> DeleteFile(string fileName)
+        [HttpDelete("{fileName}")]
+        public async Task<IActionResult> Delete(string fileName)
         {
             await _storageService.DeleteAsync(fileName);
-            return Ok($"Deleted: {fileName}");
+            return Ok(new { message = "File deleted successfully." });
         }
     }
 }

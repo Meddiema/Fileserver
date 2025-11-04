@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.FileProviders;
-using FileServer.Filters; // ✅ Add this at the top
+using FileServer.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,40 +16,37 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; // 2 GB
     options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(30);
     options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(30);
+    options.ListenAnyIP(8080); // Force port 8080 for Render
 });
 
-// ✅ Add Controllers + Swagger + Fix for File Uploads
+// ✅ Add Controllers + Swagger + Filter
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SupportNonNullableReferenceTypes();
-    c.OperationFilter<FileUploadOperationFilter>(); // 👈 Fixes Swagger upload error
+    c.OperationFilter<FileUploadOperationFilter>();
 });
 
-// ✅ Enable CORS for mobile uploads/downloads
+// ✅ Enable CORS (for mobile & web)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
     });
 });
 
 var app = builder.Build();
 
-// ✅ Always enable Swagger
+// ✅ Swagger always visible
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
-    c.RoutePrefix = string.Empty; // Open Swagger UI at root
+    c.RoutePrefix = string.Empty; // Open Swagger at root
 });
 
-// ✅ Enable CORS globally
+// ✅ CORS + middleware
 app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();
@@ -57,19 +54,16 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// ✅ Ensure Uploads folder exists (for local testing only)
+// ✅ Ensure Uploads folder exists (local testing only)
 var uploadPath = Path.Combine(app.Environment.ContentRootPath, "Uploads");
 if (!Directory.Exists(uploadPath))
-{
     Directory.CreateDirectory(uploadPath);
-}
 
-// ✅ Serve static files (optional for testing)
+// ✅ Serve static uploaded files
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/uploads"
 });
 
-// ✅ Start app
 app.Run();

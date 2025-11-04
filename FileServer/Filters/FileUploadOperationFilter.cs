@@ -1,6 +1,5 @@
 ﻿using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace FileServer.Filters
@@ -9,32 +8,36 @@ namespace FileServer.Filters
     {
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            var fileParams = context.MethodInfo.GetParameters()
-                .Where(p => p.ParameterType == typeof(Microsoft.AspNetCore.Http.IFormFile));
-            if (!fileParams.Any()) return;
+            var fileParams = context.MethodInfo
+                .GetParameters()
+                .Where(p => p.ParameterType == typeof(IFormFile))
+                .ToList();
 
-            operation.RequestBody = new OpenApiRequestBody
+            if (fileParams.Any())
             {
-                Content =
+                operation.RequestBody = new OpenApiRequestBody
                 {
-                    ["multipart/form-data"] = new OpenApiMediaType
+                    Content =
                     {
-                        Schema = new OpenApiSchema
+                        ["multipart/form-data"] = new OpenApiMediaType
                         {
-                            Type = "object",
-                            Properties =
+                            Schema = new OpenApiSchema
                             {
-                                ["file"] = new OpenApiSchema
-                                {
-                                    Type = "string",
-                                    Format = "binary"
-                                }
-                            },
-                            Required = new HashSet<string> { "file" }
+                                Type = "object",
+                                Properties = fileParams.ToDictionary(
+                                    p => p.Name!,
+                                    p => new OpenApiSchema
+                                    {
+                                        Type = "string",
+                                        Format = "binary"
+                                    }
+                                ),
+                                Required = fileParams.Select(p => p.Name!).ToHashSet()
+                            }
                         }
                     }
-                }
-            };
+                };
+            }
         }
     }
 }
