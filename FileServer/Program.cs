@@ -36,9 +36,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ✅ Use Swagger UI in both dev & production
+// ✅ Always enable Swagger (both Development & Production)
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
+    c.RoutePrefix = string.Empty; // Open Swagger directly at the root URL
+});
 
 // ✅ Enable CORS globally
 app.UseCors("AllowAll");
