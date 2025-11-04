@@ -14,12 +14,8 @@ namespace FileServer.Controllers
             _storageService = new SupabaseStorageService();
         }
 
-        /// <summary>
-        /// Upload a file to Supabase Storage (hidden from Swagger UI)
-        /// </summary>
+        // ✅ Upload endpoint (already working on mobile)
         [HttpPost("upload")]
-        [ApiExplorerSettings(IgnoreApi = true)]  // ✅ hides from Swagger but still works
-        [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
@@ -28,17 +24,10 @@ namespace FileServer.Controllers
             using var stream = file.OpenReadStream();
             var url = await _storageService.UploadAsync(stream, file.FileName, file.ContentType);
 
-            return Ok(new
-            {
-                fileName = file.FileName,
-                length = file.Length,
-                url
-            });
+            return Ok(new { FileName = file.FileName, Url = url });
         }
 
-        /// <summary>
-        /// List all uploaded files
-        /// </summary>
+        // ✅ List files (for Received Files page)
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
@@ -46,20 +35,15 @@ namespace FileServer.Controllers
             return Ok(files);
         }
 
-        /// <summary>
-        /// Get a direct public download link for a file
-        /// </summary>
+        // ✅ Download file by filename
         [HttpGet("download/{fileName}")]
         public async Task<IActionResult> Download(string fileName)
         {
             if (string.IsNullOrWhiteSpace(fileName))
                 return BadRequest("Invalid file name.");
 
-            var url = await _storageService.GetPublicUrlAsync(fileName);
-            if (string.IsNullOrEmpty(url))
-                return NotFound();
-
-            return Redirect(url); // redirects user to Supabase public URL
+            var stream = await _storageService.DownloadAsync(fileName);
+            return File(stream, "application/octet-stream", fileName);
         }
     }
 }
