@@ -11,7 +11,7 @@ builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; // 2 GB
 });
 
-// ✅ Configure Kestrel for Render
+// ✅ Configure Kestrel for Render (port 8080)
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(8080); // Render requires port 8080
@@ -35,7 +35,7 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<FileUploadOperationFilter>();
 });
 
-// ✅ Enable CORS (for mobile devices)
+// ✅ Enable CORS (for mobile apps)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -46,32 +46,33 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ✅ Always show Swagger (even in production)
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
-    c.RoutePrefix = string.Empty; // Show at root
-});
+// ✅ Middleware order matters
+
+app.UseHttpsRedirection();
 
 // ✅ Enable CORS globally
 app.UseCors("AllowAll");
 
-app.UseHttpsRedirection();
-app.UseAuthorization();
-
-app.MapControllers();
-
-// ✅ Create Uploads directory if needed
+// ✅ Serve static files (optional)
 var uploadPath = Path.Combine(app.Environment.ContentRootPath, "Uploads");
 if (!Directory.Exists(uploadPath))
     Directory.CreateDirectory(uploadPath);
 
-// ✅ Serve static files (optional)
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/uploads"
 });
+
+// ✅ Always show Swagger (even in production)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
+    c.RoutePrefix = string.Empty; // Swagger opens at root
+});
+
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();

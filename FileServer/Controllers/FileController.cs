@@ -14,7 +14,9 @@ namespace FileServer.Controllers
             _storageService = new SupabaseStorageService();
         }
 
-        // ✅ Upload file
+        /// <summary>
+        /// Upload a file to Supabase Storage
+        /// </summary>
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
@@ -24,23 +26,23 @@ namespace FileServer.Controllers
 
             using var stream = file.OpenReadStream();
             var url = await _storageService.UploadAsync(stream, file.FileName, file.ContentType);
-            return Ok(new { fileName = file.FileName, length = file.Length, url });
+
+            return Ok(new
+            {
+                fileName = file.FileName,
+                length = file.Length,
+                url
+            });
         }
 
-        // ✅ List all files
+        /// <summary>
+        /// List all files
+        /// </summary>
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
             var files = await _storageService.ListFilesAsync();
             return Ok(files);
-        }
-
-        // ✅ Delete file
-        [HttpDelete("{fileName}")]
-        public async Task<IActionResult> Delete(string fileName)
-        {
-            await _storageService.DeleteAsync(fileName);
-            return Ok(new { message = "File deleted successfully." });
         }
     }
 }
