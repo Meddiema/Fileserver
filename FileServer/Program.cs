@@ -36,30 +36,34 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ✅ Always enable Swagger (both Development & Production)
+// ✅ Always enable Swagger (Development & Production)
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
-    c.RoutePrefix = string.Empty; // Open Swagger directly at the root URL
+    c.RoutePrefix = string.Empty; // Swagger opens directly at root
 });
 
 // ✅ Enable CORS globally
 app.UseCors("AllowAll");
 
-app.UseHttpsRedirection();
-app.UseAuthorization();
+// ✅ Only use HTTPS redirection locally
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 
+app.UseAuthorization();
 app.MapControllers();
 
-// ✅ Ensure Uploads folder exists (local testing only)
+// ✅ Ensure Uploads folder exists (for local testing only)
 var uploadPath = Path.Combine(app.Environment.ContentRootPath, "Uploads");
 if (!Directory.Exists(uploadPath))
 {
     Directory.CreateDirectory(uploadPath);
 }
 
-// ✅ Serve static files directly (optional)
+// ✅ Serve static files directly (optional for testing)
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
