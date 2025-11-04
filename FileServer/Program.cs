@@ -3,6 +3,9 @@ using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ✅ Force ASP.NET Core to listen on port 8080 (required by Render)
+builder.WebHost.UseUrls("http://0.0.0.0:8080");
+
 // ✅ Allow large uploads (up to 2 GB)
 builder.Services.Configure<FormOptions>(options =>
 {

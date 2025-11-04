@@ -38,6 +38,7 @@ C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebass
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.development.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.build.endpoints.json
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\swae.build.ex.cache
+C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.csproj.Up2Date
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\FileServer.dll
 C:\Users\MEDDIE\source\repos\FileServer\FileServer\obj\Debug\net8.0\refint\FileServer.dll
