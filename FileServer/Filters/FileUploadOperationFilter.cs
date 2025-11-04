@@ -1,6 +1,7 @@
 ﻿using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
 
 namespace FileServer.Filters
 {
@@ -8,9 +9,8 @@ namespace FileServer.Filters
     {
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            var fileParams = context.MethodInfo
-                .GetParameters()
-                .Where(p => p.ParameterType == typeof(IFormFile))
+            var fileParams = context.ApiDescription.ParameterDescriptions
+                .Where(p => p.Type == typeof(IFormFile))
                 .ToList();
 
             if (fileParams.Any())
