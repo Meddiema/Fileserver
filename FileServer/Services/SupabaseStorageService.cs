@@ -113,7 +113,7 @@ namespace FileServer.Services
             }
         }
 
-        // ✅ Optional - Download a file as stream (for mobile use)
+        // ✅ Optional - Download file
         public async Task<Stream> DownloadAsync(string fileName)
         {
             var downloadUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
@@ -123,6 +123,13 @@ namespace FileServer.Services
                 throw new Exception($"Download failed: {response.StatusCode}");
 
             return await response.Content.ReadAsStreamAsync();
+        }
+
+        // ✅ Returns a public URL for the specified file
+        public Task<string> GetPublicUrlAsync(string fileName)
+        {
+            var publicUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
+            return Task.FromResult(publicUrl);
         }
     }
 }

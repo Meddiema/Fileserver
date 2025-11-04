@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using FileServer.Services;
+﻿using FileServer.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace FileServer.Controllers
 {
@@ -15,9 +15,10 @@ namespace FileServer.Controllers
         }
 
         /// <summary>
-        /// Upload a file to Supabase Storage
+        /// Upload a file to Supabase Storage (hidden from Swagger UI)
         /// </summary>
         [HttpPost("upload")]
+        [ApiExplorerSettings(IgnoreApi = true)]  // ✅ hides from Swagger but still works
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload([FromForm] IFormFile file)
         {
@@ -36,13 +37,29 @@ namespace FileServer.Controllers
         }
 
         /// <summary>
-        /// List all files
+        /// List all uploaded files
         /// </summary>
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
             var files = await _storageService.ListFilesAsync();
             return Ok(files);
+        }
+
+        /// <summary>
+        /// Get a direct public download link for a file
+        /// </summary>
+        [HttpGet("download/{fileName}")]
+        public async Task<IActionResult> Download(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return BadRequest("Invalid file name.");
+
+            var url = await _storageService.GetPublicUrlAsync(fileName);
+            if (string.IsNullOrEmpty(url))
+                return NotFound();
+
+            return Redirect(url); // redirects user to Supabase public URL
         }
     }
 }
