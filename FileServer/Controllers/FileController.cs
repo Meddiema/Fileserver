@@ -17,6 +17,7 @@ namespace FileServer.Controllers
         }
 
 #if !DEBUG
+        // 👇 Hide from Swagger in production (to prevent 500 errors)
         [ApiExplorerSettings(IgnoreApi = true)]
 #endif
         [HttpPost("upload")]
@@ -44,6 +45,7 @@ namespace FileServer.Controllers
             }
         }
 
+        // ✅ List all files in Supabase bucket
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
@@ -56,7 +58,6 @@ namespace FileServer.Controllers
                     Name = f.Name,
                     Size = f.Size,
                     PublicUrl = f.PublicUrl,
-                    // 👇 Use the actual name in the download link
                     DownloadUrl = $"{Request.Scheme}://{Request.Host}/api/file/download?url={Uri.EscapeDataString(f.PublicUrl)}",
                     Uploaded = DateTime.UtcNow
                 });
@@ -69,7 +70,7 @@ namespace FileServer.Controllers
             }
         }
 
-        // ✅ Download a file using full URL
+        // ✅ Download a file using the full public URL
         [HttpGet("download")]
         public async Task<IActionResult> Download([FromQuery] string url)
         {
@@ -78,18 +79,23 @@ namespace FileServer.Controllers
 
             try
             {
-                // Decode the URL just in case
-                var decodedUrl = HttpUtility.UrlDecode(url);
+                var decodedUrl = Uri.UnescapeDataString(HttpUtility.UrlDecode(url));
 
-                // ✅ Get the actual stream directly from Supabase public URL
+                if (!decodedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    return BadRequest("Invalid Supabase file URL.");
+
                 var stream = await _storageService.DownloadFromUrlAsync(decodedUrl);
 
-                var fileName = Path.GetFileName(decodedUrl);
+                var fileName = Path.GetFileName(new Uri(decodedUrl).LocalPath);
                 return File(stream, "application/octet-stream", fileName);
             }
             catch (FileNotFoundException)
             {
                 return NotFound(new { error = "File not found on Supabase." });
+            }
+            catch (HttpRequestException ex)
+            {
+                return StatusCode(502, new { error = $"Network error while downloading: {ex.Message}" });
             }
             catch (Exception ex)
             {

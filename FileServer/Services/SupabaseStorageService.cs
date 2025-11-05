@@ -32,15 +32,9 @@ namespace FileServer.Services
             _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
         }
 
-        // ✅ Upload file to Supabase public bucket
+        // ✅ Upload file to Supabase bucket
         public async Task<string> UploadAsync(Stream stream, string originalFileName, string contentType)
         {
-            if (stream == null)
-                throw new ArgumentNullException(nameof(stream));
-
-            if (string.IsNullOrEmpty(originalFileName))
-                throw new ArgumentNullException(nameof(originalFileName));
-
             var path = $"{Guid.NewGuid()}_{originalFileName}";
             var uploadUrl = $"{_supabaseUrl}/storage/v1/object/{_bucketName}/{path}";
 
@@ -54,24 +48,23 @@ namespace FileServer.Services
                 throw new Exception($"Supabase upload failed: {response.StatusCode} - {error}");
             }
 
-            // Return public URL
             return $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{path}";
         }
 
-        // ✅ List all files in Supabase bucket
+        // ✅ List all files with details
         public async Task<List<(string Name, long Size, string PublicUrl)>> ListFilesAsync()
         {
             var listUrl = $"{_supabaseUrl}/storage/v1/object/list/{_bucketName}";
 
-            var requestBody = new
+            var body = new
             {
                 prefix = "",
                 limit = 100,
                 offset = 0,
-                sortBy = new { column = "created_at", order = "desc" }
+                sortBy = new { column = "name", order = "asc" }
             };
 
-            var jsonBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            var jsonBody = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync(listUrl, jsonBody);
 
             if (!response.IsSuccessStatusCode)
@@ -82,33 +75,16 @@ namespace FileServer.Services
 
             var json = await response.Content.ReadAsStringAsync();
             var files = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
-            var result = new List<(string, long, string)>();
+            var result = new List<(string Name, long Size, string PublicUrl)>();
 
             if (files != null)
             {
                 foreach (var file in files)
                 {
                     string name = file.ContainsKey("name") ? file["name"]?.ToString() ?? "unknown" : "unknown";
-                    long size = 0;
-
-                    // Try extract size if metadata is present
-                    if (file.ContainsKey("metadata") && file["metadata"] != null)
-                    {
-                        try
-                        {
-                            var metadata = file["metadata"]?.ToString();
-                            if (!string.IsNullOrWhiteSpace(metadata))
-                            {
-                                using var doc = JsonDocument.Parse(metadata);
-                                if (doc.RootElement.TryGetProperty("size", out var sizeProp))
-                                    size = sizeProp.GetInt64();
-                            }
-                        }
-                        catch
-                        {
-                            size = 0; // fallback
-                        }
-                    }
+                    long size = file.ContainsKey("metadata") && file["metadata"] != null
+                        ? GetFileSize(file["metadata"].ToString())
+                        : 0;
 
                     string publicUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{name}";
                     result.Add((name, size, publicUrl));
@@ -118,24 +94,28 @@ namespace FileServer.Services
             return result;
         }
 
-        // ✅ Download file by name (legacy endpoint)
-        public async Task<Stream> DownloadAsync(string fileName)
+        private static long GetFileSize(string metadataJson)
         {
-            var downloadUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
-            var response = await _httpClient.GetAsync(downloadUrl);
-
-            if (!response.IsSuccessStatusCode)
-                throw new Exception($"Download failed: {response.StatusCode}");
-
-            return await response.Content.ReadAsStreamAsync();
+            try
+            {
+                using var doc = JsonDocument.Parse(metadataJson);
+                if (doc.RootElement.TryGetProperty("size", out var sizeProp))
+                    return sizeProp.GetInt64();
+            }
+            catch { }
+            return 0;
         }
 
-        // ✅ NEW — Download file directly from its full Supabase public URL
+        // ✅ Download file directly from Supabase public URL
         public async Task<Stream> DownloadFromUrlAsync(string fileUrl)
         {
-            var response = await _httpClient.GetAsync(fileUrl);
+            using var request = new HttpRequestMessage(HttpMethod.Get, fileUrl);
+            request.Headers.Add("apikey", _supabaseKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _supabaseKey);
+
+            var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
-                throw new FileNotFoundException($"Failed to download file from {fileUrl}");
+                throw new FileNotFoundException($"Failed to download file from {fileUrl} (Status: {response.StatusCode})");
 
             return await response.Content.ReadAsStreamAsync();
         }
