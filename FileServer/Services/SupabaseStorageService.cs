@@ -81,7 +81,6 @@ namespace FileServer.Services
             }
 
             var json = await response.Content.ReadAsStringAsync();
-
             var files = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
             var result = new List<(string, long, string)>();
 
@@ -119,7 +118,7 @@ namespace FileServer.Services
             return result;
         }
 
-        // ✅ Download file by name
+        // ✅ Download file by name (legacy endpoint)
         public async Task<Stream> DownloadAsync(string fileName)
         {
             var downloadUrl = $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
@@ -127,6 +126,16 @@ namespace FileServer.Services
 
             if (!response.IsSuccessStatusCode)
                 throw new Exception($"Download failed: {response.StatusCode}");
+
+            return await response.Content.ReadAsStreamAsync();
+        }
+
+        // ✅ NEW — Download file directly from its full Supabase public URL
+        public async Task<Stream> DownloadFromUrlAsync(string fileUrl)
+        {
+            var response = await _httpClient.GetAsync(fileUrl);
+            if (!response.IsSuccessStatusCode)
+                throw new FileNotFoundException($"Failed to download file from {fileUrl}");
 
             return await response.Content.ReadAsStreamAsync();
         }

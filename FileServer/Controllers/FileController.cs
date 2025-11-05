@@ -1,6 +1,7 @@
 ﻿using FileServer.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.IO;
+using System.Web;
 
 namespace FileServer.Controllers
 {
@@ -15,7 +16,6 @@ namespace FileServer.Controllers
             _storageService = new SupabaseStorageService();
         }
 
-        // ✅ Upload endpoint (HIDDEN from Swagger to avoid 500 error)
 #if !DEBUG
         [ApiExplorerSettings(IgnoreApi = true)]
 #endif
@@ -44,13 +44,11 @@ namespace FileServer.Controllers
             }
         }
 
-        // ✅ List files (shows proper names, sizes, and download links)
         [HttpGet("list")]
         public async Task<IActionResult> ListFiles()
         {
             try
             {
-                // Now expecting tuple data (Name, Size, PublicUrl)
                 var fileTuples = await _storageService.ListFilesAsync();
 
                 var files = fileTuples.Select(f => new
@@ -58,7 +56,8 @@ namespace FileServer.Controllers
                     Name = f.Name,
                     Size = f.Size,
                     PublicUrl = f.PublicUrl,
-                    DownloadUrl = $"{Request.Scheme}://{Request.Host}/api/file/download/{Uri.EscapeDataString(f.Name)}",
+                    // 👇 Use the actual name in the download link
+                    DownloadUrl = $"{Request.Scheme}://{Request.Host}/api/file/download?url={Uri.EscapeDataString(f.PublicUrl)}",
                     Uploaded = DateTime.UtcNow
                 });
 
@@ -70,21 +69,27 @@ namespace FileServer.Controllers
             }
         }
 
-        // ✅ Download a file (works for mobile or browser)
-        [HttpGet("download/{fileName}")]
-        public async Task<IActionResult> Download(string fileName)
+        // ✅ Download a file using full URL
+        [HttpGet("download")]
+        public async Task<IActionResult> Download([FromQuery] string url)
         {
-            if (string.IsNullOrWhiteSpace(fileName))
-                return BadRequest("Invalid file name.");
+            if (string.IsNullOrWhiteSpace(url))
+                return BadRequest("Invalid download URL.");
 
             try
             {
-                var stream = await _storageService.DownloadAsync(fileName);
+                // Decode the URL just in case
+                var decodedUrl = HttpUtility.UrlDecode(url);
+
+                // ✅ Get the actual stream directly from Supabase public URL
+                var stream = await _storageService.DownloadFromUrlAsync(decodedUrl);
+
+                var fileName = Path.GetFileName(decodedUrl);
                 return File(stream, "application/octet-stream", fileName);
             }
             catch (FileNotFoundException)
             {
-                return NotFound(new { error = "File not found." });
+                return NotFound(new { error = "File not found on Supabase." });
             }
             catch (Exception ex)
             {
